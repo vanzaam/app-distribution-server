@@ -12,3 +12,9 @@ __pycache__/
 *.so
 .DS_Store
 .gitignore
+combined_part_a.txt
+combined_part_b.txt
+combined_part_c.txt
+combined_part_d.txt
+combined_part_e.txt
+combined.txt

@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+import os
+load_dotenv()  # Загружает переменные из .env файла
+
 from copy import copy
 
 from fastapi import APIRouter, FastAPI, Response
