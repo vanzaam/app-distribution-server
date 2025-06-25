@@ -81,37 +81,36 @@ class BuildInfo(LegacyAppInfo):
         return f"{self.file_size / one_kb**3:.2f}GB"
 
 
-def get_build_info_from_ipa(
-    upload_id: str,
-    ipa_file: BytesIO,
-) -> BuildInfo:
+def get_build_info_from_ipa(upload_id: str, ipa_file: BytesIO) -> BuildInfo:
     with zipfile.ZipFile(ipa_file, "r") as ipa:
         for file in ipa.namelist():
-            if file.endswith(".app/Info.plist"):
+            if file.count('/') == 2 and file.endswith(".app/Info.plist"):
                 plist_file_content = ipa.read(file)
+                try:
+                    info = plistlib.loads(plist_file_content)
+                    bundle_id = info.get("CFBundleIdentifier")
+                    app_title = info.get("CFBundleName")
+                    bundle_version = info.get("CFBundleShortVersionString")
 
-                info = plistlib.loads(plist_file_content)
-                bundle_id = info.get("CFBundleIdentifier")
-                app_title = info.get("CFBundleName")
-                bundle_version = info.get("CFBundleShortVersionString")
+                    if bundle_id is None or app_title is None or bundle_version is None:
+                        logger.error(f"Failed to extract valid plist data from {file}")
+                        continue  # Пропускаем файл с некорректными данными
 
-                if bundle_id is None or app_title is None or bundle_version is None:
-                    logger.error("Failed to extract plist file information")
-                    raise InvalidFileTypeError()
+                    return BuildInfo(
+                        upload_id=upload_id,
+                        platform=Platform.ios,
+                        app_title=app_title,
+                        bundle_id=bundle_id,
+                        bundle_version=bundle_version,
+                        created_at=datetime.now(timezone.utc),
+                        file_size=ipa_file.getbuffer().nbytes,
+                    )
+                except plistlib.InvalidFileException as e:
+                    logger.error(f"Invalid plist file {file}: {e}")
+                    continue  # Продолжаем поиск при ошибке парсинга
 
-                return BuildInfo(
-                    upload_id=upload_id,
-                    platform=Platform.ios,
-                    app_title=app_title,
-                    bundle_id=bundle_id,
-                    bundle_version=bundle_version,
-                    created_at=datetime.now(timezone.utc),
-                    file_size=ipa_file.getbuffer().nbytes,
-                )
-
-    logger.error("Could not find plist file in bundle")
+    logger.error("Could not find valid plist file in bundle")
     raise InvalidFileTypeError()
-
 
 def get_build_info_from_apk(
     upload_id: str,
